@@ -1010,6 +1010,8 @@ function hostStartGame() {
 // ===== 観察タイム =====
 function renderObserve() {
   showScreen('observe');
+  renderObserveData();
+}
 function renderObserveData() {
   var obs = gameState.observeTimer || { running: false, seconds: 180 };
   var sec = obs.seconds;
