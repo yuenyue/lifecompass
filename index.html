@@ -696,15 +696,19 @@ function checkPassword() {
   var v = document.getElementById('pw-input').value.trim();
   var errEl = document.getElementById('pw-error');
   if (!v) { errEl.textContent = 'コードを入力してください'; return; }
-  // Firebaseからコードを検索
-  db.ref('access_codes').orderByChild('code').equalTo(v).once('value').then(function(snap) {
-    if (!snap.exists()) {
+  errEl.textContent = '確認中…';
+  db.ref('access_codes').once('value').then(function(snap) {
+    var found = null;
+    if (snap.exists()) {
+      snap.forEach(function(child) {
+        var d = child.val();
+        if (d.code === v) { found = d; }
+      });
+    }
+    if (!found) {
       errEl.textContent = 'コードが正しくありません。';
       return;
     }
-    var found = null;
-    snap.forEach(function(child) { found = child.val(); });
-    if (!found) { errEl.textContent = 'コードが正しくありません。'; return; }
     if (found.expiry) {
       var today = new Date(); today.setHours(0,0,0,0);
       var exp = new Date(found.expiry); exp.setHours(23,59,59,999);
@@ -715,21 +719,8 @@ function checkPassword() {
     }
     errEl.textContent = '';
     showScreen('opening');
-  }).catch(function() {
-    // Firebaseに接続できない場合はローカルフォールバック
-    var fallback = [
-      { code: 'lifecompass2024', expiry: '2027-03-31' },
-      { code: 'unlimited001', expiry: null }
-    ];
-    var matched = fallback.find(function(p) { return p.code === v; });
-    if (!matched) { errEl.textContent = 'コードが正しくありません。'; return; }
-    if (matched.expiry) {
-      var today = new Date(); today.setHours(0,0,0,0);
-      var exp = new Date(matched.expiry); exp.setHours(23,59,59,999);
-      if (today > exp) { errEl.textContent = '有効期限が切れています。'; return; }
-    }
-    errEl.textContent = '';
-    showScreen('opening');
+  }).catch(function(e) {
+    errEl.textContent = '接続エラーが発生しました。再度お試しください。';
   });
 }
 
