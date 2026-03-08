@@ -935,12 +935,13 @@ function leaveRoom() {
 }
 
 // ===== UI同期 =====
+var lastStatus = '';
 function syncUI() {
   var status = gameState.status;
   if (status === 'lobby') renderLobby();
-  else if (status === 'observe') renderObserve();
-  else if (status === 'game') renderGame();
-  else if (status === 'sharing') renderSharing();
+  else if (status === 'observe') { if (lastStatus !== 'observe') { showScreen('observe'); lastStatus = 'observe'; } renderObserveData(); }
+  else if (status === 'game') { if (lastStatus !== 'game') { showScreen('game'); lastStatus = 'game'; } renderGameData(); }
+  else if (status === 'sharing') { if (lastStatus !== 'sharing') { showScreen('sharing'); lastStatus = 'sharing'; } renderSharingData(); }
 }
 
 // ===== ロビー =====
@@ -1009,6 +1010,7 @@ function hostStartGame() {
 // ===== 観察タイム =====
 function renderObserve() {
   showScreen('observe');
+function renderObserveData() {
   var obs = gameState.observeTimer || { running: false, seconds: 180 };
   var sec = obs.seconds;
   var m = Math.floor(sec/60).toString().padStart(2,'0');
@@ -1325,6 +1327,165 @@ function hostRestartGame() {
   });
 }
 
+// ===== 画面更新エイリアス（スクロールなし） =====
+function renderObserveData() {
+  var obs = gameState.observeTimer || { running: false, seconds: 180 };
+  var sec = obs.seconds;
+  var m = Math.floor(sec/60).toString().padStart(2,'0');
+  var s = (sec%60).toString().padStart(2,'0');
+  var el = document.getElementById('observe-timer');
+  if (el) {
+    el.textContent = m + ':' + s;
+    el.style.color = sec <= 30 ? '#ef4444' : '#4a7c59';
+  }
+  document.getElementById('observe-controls').style.display = myRole === 'host' ? 'block' : 'none';
+  document.getElementById('observe-guest-msg').style.display = myRole !== 'host' ? 'block' : 'none';
+  if (obs.running) {
+    clearInterval(observeInterval);
+    observeInterval = setInterval(function() {
+      var cur = gameState.observeTimer ? gameState.observeTimer.seconds : 0;
+      if (cur > 0) { roomRef.child('observeTimer/seconds').set(cur - 1); }
+      else { clearInterval(observeInterval); roomRef.child('observeTimer/running').set(false); playMusic(); showToast('🎵 観察タイム終了！'); }
+    }, 1000);
+  } else { clearInterval(observeInterval); }
+}
+
+function renderGameData() {
+  var gs = gameState;
+  var order = gs.playerOrder || [];
+  var turn = gs.currentTurn || 0;
+  var total = gs.totalTurns || 0;
+  var presenterIdx = turn % order.length;
+  var questionerIdx = (presenterIdx + 1) % order.length;
+  var presenterName = order[presenterIdx];
+  var questionerName = order[questionerIdx];
+  var isPresenter = myName === presenterName;
+  var isQuestioner = myName === questionerName;
+  var roundNum = Math.floor(turn / order.length) + 1;
+
+  document.getElementById('turn-badge').textContent = 'TURN ' + (turn+1) + ' / ' + total + '　（第' + roundNum + '回）';
+  document.getElementById('presenter-name').textContent = presenterName;
+  document.getElementById('questioner-name').textContent = questionerName;
+
+  var timer = gs.timer || { running: false, seconds: 600 };
+  var tm = Math.floor(timer.seconds/60).toString().padStart(2,'0');
+  var ts = (timer.seconds%60).toString().padStart(2,'0');
+  var tc = document.getElementById('timer-circle');
+  if (tc) { tc.textContent = tm + ':' + ts; tc.classList.toggle('warn', timer.seconds <= 120); }
+
+  document.getElementById('timer-controls').style.display = myRole === 'host' ? 'flex' : 'none';
+
+  if (timer.running) {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(function() {
+      var cur = gameState.timer ? gameState.timer.seconds : 0;
+      if (cur > 0) { roomRef.child('timer/seconds').set(cur - 1); }
+      else { clearInterval(timerInterval); roomRef.child('timer/running').set(false); playMusic(); showToast('🎵 発表タイム終了！'); }
+    }, 1000);
+  } else { clearInterval(timerInterval); }
+
+  var canSelectValue = isPresenter;
+  var canSelectQ = isQuestioner;
+  var selV = gs.selectedValue;
+  var selQ = gs.selectedQ;
+
+  // 選択表示のみ更新（カードグリッドは再描画しない）
+  var vd = document.getElementById('selected-value-display');
+  var qd = document.getElementById('selected-q-display');
+  if (vd) {
+    if (selV !== null && selV !== undefined) { vd.className = 'selected-value-card'; vd.textContent = VALUE_CARDS[selV]; }
+    else { vd.className = 'empty-card'; vd.textContent = 'カードを選んでください'; }
+  }
+  if (qd) {
+    if (selQ !== null && selQ !== undefined) { qd.className = 'selected-q-card'; qd.textContent = QUESTION_CARDS[selQ]; }
+    else { qd.className = 'empty-card'; qd.textContent = '質問カードを選んでください'; }
+  }
+
+  // カードグリッド更新
+  var vgrid = document.getElementById('value-grid');
+  if (vgrid) {
+    vgrid.innerHTML = VALUE_CARDS.map(function(c, i) {
+      var colorClass = i < 10 ? 'green' : 'crimson';
+      var isSelected = selV === i;
+      var disabled = !canSelectValue ? 'opacity:0.6;cursor:not-allowed;' : '';
+      return '<div class="vcard ' + colorClass + (isSelected ? ' selected' : '') + '" style="' + disabled + '" '
+        + (canSelectValue ? 'onclick="selectValue(' + i + ')"' : '') + '>'
+        + '<div class="vcard-num">' + (i+1) + '</div>'
+        + '<img src="' + ICON_B64 + '" style="position:absolute;width:60%;height:60%;object-fit:contain;opacity:0.35;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;" />'
+        + '<div class="vcard-text">' + c + '</div></div>';
+    }).join('');
+  }
+
+  var qgrid = document.getElementById('qcard-grid');
+  if (qgrid) {
+    qgrid.innerHTML = QUESTION_CARDS.map(function(q, i) {
+      var isSelected = selQ === i;
+      var disabled = !canSelectQ ? 'opacity:0.6;cursor:not-allowed;' : '';
+      return '<div class="qcard' + (isSelected ? ' selected' : '') + '" style="' + disabled + '" '
+        + (canSelectQ ? 'onclick="selectQ(' + i + ')"' : '') + '>'
+        + '<span class="qnum">Q' + (i+1) + '</span><span>' + q + '</span></div>';
+    }).join('');
+  }
+
+  document.getElementById('value-panel-label').textContent = canSelectValue ? '価値観カードを選ぶ（あなたの番です）' : '価値観カードを選ぶ（' + presenterName + 'さんが選択中）';
+  document.getElementById('q-panel-label').textContent = canSelectQ ? '質問カードを選ぶ（あなたの番です）' : '質問カードを選ぶ（' + questionerName + 'さんが選択中）';
+  document.getElementById('game-footer').style.display = myRole === 'host' ? 'flex' : 'none';
+
+  var statusEl = document.getElementById('all-players-status-list');
+  if (statusEl) {
+    var cr = gs.currentRound || {};
+    statusEl.innerHTML = order.map(function(name, i) {
+      var color = AVATAR_COLORS[i % AVATAR_COLORS.length];
+      var isNow = i === presenterIdx;
+      var result = cr[name];
+      return '<div class="status-player-row">'
+        + '<div class="status-avatar" style="background:' + color + (isNow ? ';border:2px solid #f472b6' : '') + '">' + name.charAt(0) + '</div>'
+        + '<div class="status-name">' + name + (isNow ? ' 🎤' : '') + '</div>'
+        + (result && result.cards && result.cards.length ? '<div class="status-card-tag">' + result.cards[0] + '</div>' : '<div style="font-size:0.72rem;color:var(--text2);">' + (isNow ? '発表中' : '待機中') + '</div>')
+        + '</div>';
+    }).join('');
+  }
+
+  var isLast = turn === total - 1;
+  var nextBtn = document.getElementById('next-btn');
+  if (nextBtn) nextBtn.textContent = isLast ? '感想共有タイムへ →' : '次のターンへ進む';
+}
+
+function renderSharingData() {
+  var gs = gameState;
+  var st = gs.sharingTimer || { running: false, seconds: 600 };
+  var m = Math.floor(st.seconds/60).toString().padStart(2,'0');
+  var s = (st.seconds%60).toString().padStart(2,'0');
+  var el = document.getElementById('sharing-timer');
+  if (el) { el.textContent = m + ':' + s; el.classList.toggle('warn', st.seconds <= 60); }
+
+  document.getElementById('sharing-controls').style.display = myRole === 'host' ? 'flex' : 'none';
+  document.getElementById('restart-btn').style.display = myRole === 'host' ? 'inline-block' : 'none';
+
+  if (st.running) {
+    clearInterval(sharingInterval);
+    sharingInterval = setInterval(function() {
+      var cur = gameState.sharingTimer ? gameState.sharingTimer.seconds : 0;
+      if (cur > 0) { roomRef.child('sharingTimer/seconds').set(cur - 1); }
+      else { clearInterval(sharingInterval); roomRef.child('sharingTimer/running').set(false); playMusic(); showToast('🎵 共有タイム終了！'); }
+    }, 1000);
+  } else { clearInterval(sharingInterval); }
+
+  var html = '';
+  var results = Array.isArray(gs.allResults) ? gs.allResults : [];
+  results.forEach(function(round, ri) {
+    html += '<div class="round-header">📋 第' + (ri+1) + '回　発表結果</div>';
+    var rows = Array.isArray(round) ? round : Object.values(round);
+    rows.forEach(function(r) {
+      html += '<div class="result-row"><div class="result-name">🌿 ' + r.name + '</div>'
+        + '<div class="result-cards">' + (r.cards && r.cards.length ? r.cards.map(function(c) { return '<span class="result-tag">' + c + '</span>'; }).join('') : '<span style="font-size:0.78rem;color:#9ca3af">選択なし</span>') + '</div>'
+        + (r.question ? '<div><span class="result-q">💬 ' + r.question + '</span></div>' : '') + '</div>';
+    });
+  });
+  var rs = document.getElementById('results-section');
+  if (rs) rs.innerHTML = html;
+}
+
 // ===== 音楽 =====
 function playMusic() {
   try {
@@ -1354,7 +1515,6 @@ function showToast(msg) {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
-  window.scrollTo(0, 0);
 }
 </script>
 </body>
