@@ -739,38 +739,57 @@ function checkAdminPassword() {
 
 function loadAdminCodes() {
   var container = document.getElementById('pw-table-body');
-  container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:1rem;">読み込み中…</div>';
+  container.innerHTML = '<div style="text-align:center;color:#8b6875;padding:1rem;">読み込み中…</div>';
   db.ref('access_codes').once('value').then(function(snap) {
     if (!snap.exists()) {
-      container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:1rem;">まだコードが発行されていません</div>';
+      container.innerHTML = '<div style="text-align:center;color:#8b6875;padding:1rem;">まだコードが発行されていません</div>';
       return;
     }
     var today = new Date(); today.setHours(0,0,0,0);
     var items = [];
-    snap.forEach(function(child) {
-      items.push({ key: child.key, val: child.val() });
-    });
+    snap.forEach(function(child) { items.push({ key: child.key, val: child.val() }); });
     items.sort(function(a,b) { return (b.val.createdAt||0) - (a.val.createdAt||0); });
-    container.innerHTML = items.map(function(item) {
+    container.innerHTML = '';
+    items.forEach(function(item) {
       var p = item.val;
-      var statusTag, statusText;
-      if (!p.expiry) { statusTag = 'tag-unlimited'; statusText = '期限なし'; }
+      var tagClass, tagText;
+      if (!p.expiry) { tagClass = 'tag-unlimited'; tagText = '期限なし'; }
       else {
         var exp = new Date(p.expiry); exp.setHours(23,59,59,999);
-        if (today > exp) { statusTag = 'tag-expired'; statusText = '期限切れ'; }
-        else { statusTag = 'tag-valid'; statusText = '有効'; }
+        tagClass = today > exp ? 'tag-expired' : 'tag-valid';
+        tagText = today > exp ? '期限切れ' : '有効';
       }
-      return '<div style="background:var(--bg2);border-radius:var(--radius-sm);padding:0.9rem 1.2rem;display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;">'
-        + '<div style="flex:1;min-width:120px;">'
-        + '<div style="font-family:'Zen Maru Gothic',sans-serif;font-size:1rem;font-weight:700;letter-spacing:0.1em;color:var(--text);">' + p.code + '</div>'
-        + '<div style="font-size:0.75rem;color:var(--text2);">' + (p.name || '') + '</div>'
-        + '</div>'
-        + '<div style="font-size:0.8rem;color:var(--text2);">期限：' + (p.expiry || '—') + '</div>'
-        + '<span class="' + statusTag + '">' + statusText + '</span>'
-        + '<button class="copy-btn" onclick="copyCode('' + p.code + '')">コピー</button>'
-        + '<button class="delete-btn" onclick="deleteCode('' + item.key + '')">削除</button>'
-        + '</div>';
-    }).join('');
+      var div = document.createElement('div');
+      div.style.cssText = 'background:#fdf2f8;border-radius:12px;padding:1rem 1.2rem;display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;margin-bottom:0.5rem;';
+      var main = document.createElement('div');
+      main.style.cssText = 'flex:1;min-width:150px;';
+      main.innerHTML = '<div style="font-size:1rem;font-weight:700;letter-spacing:0.1em;color:#3d2c35;">' + p.code + '</div>'
+        + '<div style="font-size:0.75rem;color:#8b6875;">' + (p.name||'') + '</div>';
+      var expDiv = document.createElement('div');
+      expDiv.style.cssText = 'font-size:0.8rem;color:#8b6875;';
+      expDiv.textContent = '期限：' + (p.expiry||'—');
+      var tag = document.createElement('span');
+      tag.className = 'status-badge ' + (tagClass === 'tag-valid' ? 'active' : tagClass === 'tag-expired' ? 'expired' : 'unlimited');
+      tag.textContent = tagText;
+      var copyBtn = document.createElement('button');
+      copyBtn.className = 'copy-btn';
+      copyBtn.textContent = 'コピー';
+      copyBtn.onclick = function() { navigator.clipboard.writeText(p.code).then(function() { showToast('コピーしました：' + p.code); }); };
+      var delBtn = document.createElement('button');
+      delBtn.className = 'delete-btn';
+      delBtn.textContent = '削除';
+      delBtn.onclick = function() {
+        if (confirm('このコードを削除しますか？')) {
+          db.ref('access_codes/' + item.key).remove().then(function() { loadAdminCodes(); showToast('削除しました'); });
+        }
+      };
+      div.appendChild(main);
+      div.appendChild(expDiv);
+      div.appendChild(tag);
+      div.appendChild(copyBtn);
+      div.appendChild(delBtn);
+      container.appendChild(div);
+    });
   });
 }
 
