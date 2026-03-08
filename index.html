@@ -602,6 +602,22 @@ body {
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
 <script>
+// ===== URL パラメータから参加処理 =====
+window.addEventListener('load', function() {
+  var params = new URLSearchParams(window.location.search);
+  var room = params.get('room');
+  var role = params.get('role');
+  var name = params.get('name');
+  if (room && role && name) {
+    myName = decodeURIComponent(name);
+    myRole = role;
+    roomCode = room;
+    roomRef = db.ref('rooms/' + room);
+    listenRoom();
+    showScreen('lobby');
+  }
+});
+
 // ===== Firebase設定 =====
 const firebaseConfig = {
   apiKey: "AIzaSyDhyDvxjrO6qf8YDRAMH78PoQFSXeoWbi4",

@@ -80,7 +80,7 @@ body { background-image: radial-gradient(ellipse at 10% 10%, rgba(252,207,232,0.
       sessionStorage.setItem('lc_name', name);
       sessionStorage.setItem('lc_role', role);
       sessionStorage.setItem('lc_room', code);
-      window.location.href = 'game.html';
+      window.location.href = 'index.html?room=' + code + '&role=' + role + '&name=' + encodeURIComponent(name);
     }).catch(function() {
       errEl.textContent = '接続エラーが発生しました。再度お試しください。';
     });
