@@ -80,7 +80,7 @@ body {
 .pw-note { font-size: 0.78rem; color: var(--text2); margin-top: 1.2rem; line-height: 1.8; }
 
 /* オープニング */
-#opening { min-height: 100vh; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+#opening { min-height: 100vh; grid-template-columns: 1fr 1fr; gap: 0; }
 .opening-left { padding: 4rem 3rem; display: flex; flex-direction: column; justify-content: center; }
 .opening-badge {
   display: inline-flex; align-items: center; gap: 0.4rem;
@@ -389,16 +389,18 @@ body {
   </div>
   <div class="opening-panel">
     <div class="panel-icon teal">👤</div>
-    <div class="panel-title">ルームに参加</div>
-    <div class="panel-desc">招待されたゲームに入る</div>
-    <label class="form-label">ルームコード</label>
-    <input class="form-input" id="join-code" placeholder="例：A1B2C3">
-    <label class="form-label">パスワード</label>
-    <input class="form-input" id="join-pass" type="password" placeholder="参加者パスワード">
-    <label class="form-label">あなたのお名前</label>
-    <input class="form-input" id="join-name" placeholder="例：鈴木 花子">
-    <div class="open-error" id="join-error"></div>
-    <button class="btn-teal" style="width:100%" onclick="joinRoom()">ゲームに参加する</button>
+    <div class="panel-title">参加者の方はこちら</div>
+    <div class="panel-desc">招待された方は参加者ページへ</div>
+    <div style="background:#f0fdf9;border:1px solid #99f6e4;border-radius:12px;padding:1.2rem;margin-bottom:1rem;font-size:0.82rem;color:#0f766e;line-height:1.8;">
+      💡 主催者からルームコードとパスワードを受け取ったら、参加者専用ページからご参加ください
+    </div>
+    <a href="join.html" style="display:block;text-align:center;background:linear-gradient(135deg,#5eead4,#2dd4bf);color:white;border-radius:50px;padding:0.9rem 2rem;font-family:'Zen Maru Gothic',sans-serif;font-size:1rem;font-weight:700;text-decoration:none;box-shadow:0 4px 15px rgba(94,234,212,0.4);">参加者ページへ →</a>
+  </div>
+  <div class="opening-panel" style="display:none;">
+    <input id="join-code" type="hidden">
+    <input id="join-pass" type="hidden">
+    <input id="join-name" type="hidden">
+    <div id="join-error"></div>
   </div>
 </div>
 
@@ -1336,7 +1338,7 @@ function showToast(msg) {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   document.getElementById(id).classList.add('active');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo(0, 0);
 }
 </script>
 </body>
